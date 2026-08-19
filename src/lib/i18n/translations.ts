@@ -19,7 +19,6 @@ type Strings = {
   totalContributed: string;
   totalInterest: string;
   chartTitle: string;
-  yearAxisSuffix: string;
   share: string;
   save: string;
   shareFooter: string;
@@ -47,7 +46,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: '넣은 원금',
     totalInterest: '이자 수익',
     chartTitle: '연도별 잔액',
-    yearAxisSuffix: '년',
     share: '공유',
     save: '이미지 저장',
     shareFooter: 'Microapp Starter 로 계산',
@@ -74,7 +72,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: 'Total contributed',
     totalInterest: 'Interest earned',
     chartTitle: 'Balance by year',
-    yearAxisSuffix: 'y',
     share: 'Share',
     save: 'Save image',
     shareFooter: 'Calculated with Microapp Starter',
@@ -101,7 +98,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: '払い込み元金',
     totalInterest: '利息',
     chartTitle: '年ごとの残高',
-    yearAxisSuffix: '年',
     share: '共有',
     save: '画像を保存',
     shareFooter: 'Microapp Starter で計算',
@@ -128,7 +124,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: 'Eingezahlt',
     totalInterest: 'Zinsertrag',
     chartTitle: 'Kapital pro Jahr',
-    yearAxisSuffix: 'J',
     share: 'Teilen',
     save: 'Bild speichern',
     shareFooter: 'Berechnet mit Microapp Starter',
@@ -155,7 +150,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: 'Total aportado',
     totalInterest: 'Intereses ganados',
     chartTitle: 'Saldo por año',
-    yearAxisSuffix: 'a',
     share: 'Compartir',
     save: 'Guardar imagen',
     shareFooter: 'Calculado con Microapp Starter',
@@ -182,7 +176,6 @@ export const translations: Record<AppLocale, Strings> = {
     totalContributed: '累计投入',
     totalInterest: '利息收益',
     chartTitle: '各年度余额',
-    yearAxisSuffix: '年',
     share: '分享',
     save: '保存图片',
     shareFooter: '由 Microapp Starter 计算',

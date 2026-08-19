@@ -199,11 +199,15 @@ export default function Index() {
       {chart && (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>{t('chartTitle')}</Text>
+          {/*
+            yAxisSuffix 는 y축(금액)에 붙는다. x축 단위(년)를 여기 주면
+            "50436.5년" 처럼 금액 뒤에 년이 붙는다. x축 단위는 카드 제목으로 알린다.
+          */}
           <ThemedLineChart
             labels={chart.labels}
             values={chart.values}
             width={Math.max(width - 64, 240)}
-            yAxisSuffix={t('yearAxisSuffix')}
+            decimalPlaces={0}
             brandColor={BRANDING.brandColor}
             colors={colors}
             style={styles.chart}

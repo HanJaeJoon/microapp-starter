@@ -3,6 +3,8 @@ import { ViewStyle } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { ThemeColors } from '../theme';
 
+const MIN_STROKE_OPACITY = 0.9;
+
 export function ThemedLineChart(props: {
   labels: string[];
   values: number[];
@@ -22,17 +24,32 @@ export function ThemedLineChart(props: {
   style?: Partial<ViewStyle>;
   /** 점을 숨긴다. 회차가 많아 점이 뭉개질 때 쓴다. */
   hideDots?: boolean;
+  /**
+   * 곡선 아래 면 채움을 끈다.
+   *
+   * chart-kit 은 면을 chartConfig.color 로 칠하기 때문에 계열마다 색을 줘도
+   * 면이 겹쳐 곡선 색이 묻힌다. 여러 계열을 겹칠 때는 꺼야 구분이 된다.
+   */
+  hideFill?: boolean;
+  /** y축 라벨 소수점 자릿수. 금액은 보통 0 이 읽기 좋다. 기본 1. */
+  decimalPlaces?: number;
 }) {
   const { colors, brandColor } = props;
+
+  // chart-kit 은 선 색 콜백에 1 보다 작은 opacity 를 넘길 때가 있어
+  // 여러 계열을 겹치면 색이 흐려져 구분이 어렵다. 하한을 둔다.
+  const strokeOpacity = (opacity: number) => Math.max(opacity, MIN_STROKE_OPACITY);
 
   const datasets = [
     {
       data: props.values,
-      color: (opacity = 1) => hexToRgba(brandColor, opacity),
+      color: (opacity = 1) => hexToRgba(brandColor, strokeOpacity(opacity)),
+      strokeWidth: 2,
     },
     ...(props.extraSeries ?? []).map((series) => ({
       data: series.values,
-      color: (opacity = 1) => hexToRgba(series.color, opacity),
+      color: (opacity = 1) => hexToRgba(series.color, strokeOpacity(opacity)),
+      strokeWidth: 2,
     })),
   ];
 
@@ -44,11 +61,12 @@ export function ThemedLineChart(props: {
       yAxisSuffix={props.yAxisSuffix ?? ''}
       yAxisInterval={1}
       withDots={!props.hideDots}
+      withShadow={!props.hideFill}
       chartConfig={{
         backgroundColor: colors.card,
         backgroundGradientFrom: colors.card,
         backgroundGradientTo: colors.card,
-        decimalPlaces: 1,
+        decimalPlaces: props.decimalPlaces ?? 1,
         color: (opacity = 1) => hexToRgba(brandColor, opacity),
         labelColor: () => colors.subtext,
         propsForDots: { r: '4', strokeWidth: '2', stroke: brandColor },
