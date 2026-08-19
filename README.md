@@ -100,6 +100,8 @@ npm start
 
 **Expo Go 에서는 광고 배너가 나오지 않는다.** AdMob 네이티브 모듈이 Expo Go 에 없어서 `kit/ads` 가 스스로 렌더를 건너뛴다. 광고는 Actions 빌드에서만 확인할 수 있다.
 
+**`npm install <패키지>` 를 개별 실행한 뒤에는 `npm ci` 가 실제로 통과하는지 확인할 것.** `eslint-config-expo` 가 끌어오는 `unrs-resolver` 는 플랫폼별 optional 바인딩이 24개 있고, Windows 에서 개별 설치를 하면 npm 이 `@emnapi/core` / `@emnapi/runtime` 을 락파일에서 지운다. Linux CI 는 이 둘을 최상위에서 요구하므로 `npm ci` 가 EUSAGE 로 거부한다. **`npm install` 로 재동기화하는 것으로는 안 고쳐진다** - `node_modules` 와 `package-lock.json` 을 둘 다 지우고 처음부터 설치해야 한다.
+
 **SDK 메이저 업그레이드에서는 `package-lock.json` 을 재생성할 것.** 기존 락파일 위에 `expo install --fix` 를 돌리면 `expo-modules-core` 가 `node_modules/expo/` 아래로 중첩 설치돼 jest-expo 프리셋과 config plugin 이 모듈을 못 찾는다.
 
 **Public 저장소를 권장한다.** GitHub Actions 분이 무제한이다. Private 은 계정 전체 월 2,000분을 공유하고 Android 릴리스 빌드가 약 25분이라 월 80회가 한계다.

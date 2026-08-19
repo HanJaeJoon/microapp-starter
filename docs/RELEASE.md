@@ -15,6 +15,30 @@
 
 `android.package` 는 Play 에 한 번 올리면 **영구히 바꿀 수 없다.** 여기서 확정한다.
 
+## 0.5 아이콘과 스토어 그래픽 (사람만 가능)
+
+**`assets/images/` 는 create-expo-app 템플릿의 Expo 로고 그대로다.** 스타터를 복제한 직후 상태에서는 항상 그렇다. 이대로 올리면 Expo 로고를 쓴 앱이 스토어에 올라간다.
+
+교체해야 하는 파일:
+
+| 파일 | 용도 | 요구 규격 |
+|---|---|---|
+| `assets/images/icon.png` | 앱 아이콘 원본 | 1024x1024 PNG, 투명 배경 없이 |
+| `assets/images/android-icon-foreground.png` | 적응형 아이콘 전경 | 432x432 PNG, 투명 배경, 안쪽 66% 안에 도형 배치 |
+| `assets/images/android-icon-background.png` | 적응형 아이콘 배경 | 432x432 PNG |
+| `assets/images/android-icon-monochrome.png` | 테마 아이콘 (Android 13+) | 432x432 PNG, 단색 실루엣 |
+| `assets/images/splash-icon.png` | 스플래시 로고 | 정사각 PNG, `app.json` 의 `imageWidth` 기준 |
+| `assets/images/favicon.png` | 웹 파비콘 | 48x48 PNG (Android 출시에는 무관) |
+| `assets/expo.icon/` | iOS 아이콘 묶음 | iOS 출시 안 하면 무관 |
+
+Play Console 에 따로 업로드하는 것 (저장소에 두지 않아도 된다):
+
+- 앱 아이콘 512x512 PNG
+- 그래픽 이미지 1024x500 PNG/JPG
+- 스크린샷 최소 2장 (16:9 또는 9:16, 최소 320px)
+
+`app.json` 의 `android.adaptiveIcon.backgroundColor` 를 브랜드 색의 연한 톤으로 맞춰 두면 도형만 바꿔도 통일감이 난다.
+
 ## 1. GitHub 저장소
 
 - [ ] 저장소 생성 (Public 권장 - Actions 분 무제한)
