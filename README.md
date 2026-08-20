@@ -37,7 +37,7 @@ src/
 2. **앱 고유 값은 인자나 prop 으로 받는다.** kit 안에 브랜드 색이나 광고 ID 를 상수로 두지 않는다
 3. **사용처가 1개뿐인 추상화는 kit 에 올리지 않는다**
 
-kit 테스트는 앱 코드 없이 독립 실행된다: `npx jest src/kit`. 이게 경계를 제대로 그었는지 확인하는 척도다.
+kit 테스트는 앱 코드 없이 독립 실행된다: `pnpm jest src/kit`. 이게 경계를 제대로 그었는지 확인하는 척도다.
 
 ## 새 앱 시작 절차
 
@@ -49,8 +49,11 @@ Create a new repository** 로 히스토리 없는 새 저장소를 만든 뒤 cl
 ```bash
 git clone https://github.com/HanJaeJoon/my-new-app
 cd my-new-app
-npm install
+pnpm install
 ```
+
+pnpm 이 없으면 `corepack enable pnpm` 으로 활성화한다. 버전은 `package.json` 의
+`packageManager` 필드에 고정돼 있다.
 
 이미 있는 저장소에 배선만 넣을 때는 template 을 쓸 수 없다. `.git` 을 제외한
 파일을 복사하고 `.gitignore` 를 병합한 뒤 한 커밋으로 올린다 (기존 히스토리 보존).
@@ -58,8 +61,8 @@ npm install
 동작 확인:
 
 ```bash
-npm run typecheck && npm run test:ci && npm run lint
-npm start
+pnpm run typecheck && pnpm run test:ci && pnpm run lint
+pnpm start
 ```
 
 ### 2. 코드에서 고칠 것 (파일 4개)
@@ -91,11 +94,11 @@ npm start
 
 | 명령 | 하는 일 |
 |---|---|
-| `npm start` | 개발 서버 |
-| `npm run typecheck` | `tsc --noEmit` (strict) |
-| `npm run test:ci` | Jest 1회 실행 |
-| `npm run lint` | ESLint (kit 단방향 의존 규칙 포함) |
-| `npx jest src/kit` | kit 테스트만 (경계 확인) |
+| `pnpm start` | 개발 서버 |
+| `pnpm run typecheck` | `tsc --noEmit` (strict) |
+| `pnpm run test:ci` | Jest 1회 실행 |
+| `pnpm run lint` | ESLint (kit 단방향 의존 규칙 포함) |
+| `pnpm jest src/kit` | kit 테스트만 (경계 확인) |
 
 ## 알아둘 제약
 
@@ -105,9 +108,11 @@ npm start
 
 **Expo Go 에서는 광고 배너가 나오지 않는다.** AdMob 네이티브 모듈이 Expo Go 에 없어서 `kit/ads` 가 스스로 렌더를 건너뛴다. 광고는 Actions 빌드에서만 확인할 수 있다.
 
-**`npm install <패키지>` 를 개별 실행한 뒤에는 `npm ci` 가 실제로 통과하는지 확인할 것.** `eslint-config-expo` 가 끌어오는 `unrs-resolver` 는 플랫폼별 optional 바인딩이 24개 있고, Windows 에서 개별 설치를 하면 npm 이 `@emnapi/core` / `@emnapi/runtime` 을 락파일에서 지운다. Linux CI 는 이 둘을 최상위에서 요구하므로 `npm ci` 가 EUSAGE 로 거부한다. **`npm install` 로 재동기화하는 것으로는 안 고쳐진다** - `node_modules` 와 `package-lock.json` 을 둘 다 지우고 처음부터 설치해야 한다.
+**패키지 매니저는 pnpm 이다 (npm 을 쓰지 말 것).** npm 은 Windows 에서 `npm install <패키지>` 를 개별 실행하면 Linux 에 필요한 optional 전이 의존(`@emnapi/*`)을 락파일에서 지워 CI 의 `npm ci` 가 죽는 문제가 있었다. pnpm 락파일은 플랫폼 무관하게 optional 의존을 전부 기록하므로 이 실패 모드가 구조적으로 없다. 설정(`nodeLinker: hoisted`, `allowBuilds`)은 `pnpm-workspace.yaml` 에 있다 - pnpm 11 부터 `.npmrc` 의 pnpm 설정은 무시된다.
 
-**SDK 메이저 업그레이드에서는 `package-lock.json` 을 재생성할 것.** 기존 락파일 위에 `expo install --fix` 를 돌리면 `expo-modules-core` 가 `node_modules/expo/` 아래로 중첩 설치돼 jest-expo 프리셋과 config plugin 이 모듈을 못 찾는다.
+**`nodeLinker: hoisted` 는 지우지 말 것.** isolated(기본값) 설치는 `react-native-google-mobile-ads` / `react-native-view-shot` / `react-native-chart-kit` 같은 네이티브 모듈이 호환되지 않을 수 있다. Expo 공식 문서도 문제가 생기면 hoisted 로 되돌리라고 안내한다.
+
+**SDK 메이저 업그레이드에서는 락파일(`pnpm-lock.yaml`)을 재생성할 것.** npm 시절 기존 락파일 위에 `expo install --fix` 를 돌리면 `expo-modules-core` 가 `node_modules/expo/` 아래로 중첩 설치돼 jest-expo 프리셋과 config plugin 이 모듈을 못 찾는 문제가 있었다. hoisted 레이아웃은 같은 위험이 있으므로 규율을 유지한다.
 
 **Public 저장소를 권장한다.** GitHub Actions 분이 무제한이다. Private 은 계정 전체 월 2,000분을 공유하고 Android 릴리스 빌드가 약 25분이라 월 80회가 한계다.
 
