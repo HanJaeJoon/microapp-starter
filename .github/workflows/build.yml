@@ -74,8 +74,19 @@ jobs:
       - name: Expo prebuild
         run: pnpm expo prebuild --platform android --clean
 
+      # 키스토어 Secrets 가 없으면(템플릿 저장소가 그렇다) 일회용 키를 만들어
+      # 파이프라인 전체를 검증한다. 그렇게 서명된 AAB 는 Play 에 올릴 수 없다 -
+      # 실제 앱은 EXPECTED_UPLOAD_CERT_SHA256 검증이 잘못된 서명을 걸러낸다.
       - name: Restore keystore
-        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          else
+            echo "::warning::키스토어 Secrets 가 없어 일회용 키로 서명합니다. 이 AAB 는 Play 업로드용이 아닙니다."
+            keytool -genkeypair -keystore "$RUNNER_TEMP/upload.jks" -alias upload \
+              -storepass throwaway -keypass throwaway -keyalg RSA -keysize 2048 \
+              -validity 1 -dname "CN=throwaway"
+          fi
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
 
@@ -88,9 +99,9 @@ jobs:
         run: |
           ./gradlew :app:bundleRelease --no-daemon \
             -Pandroid.injected.signing.store.file="$RUNNER_TEMP/upload.jks" \
-            -Pandroid.injected.signing.store.password="$ANDROID_KEYSTORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$ANDROID_KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$ANDROID_KEY_PASSWORD"
+            -Pandroid.injected.signing.store.password="${ANDROID_KEYSTORE_PASSWORD:-throwaway}" \
+            -Pandroid.injected.signing.key.alias="${ANDROID_KEY_ALIAS:-upload}" \
+            -Pandroid.injected.signing.key.password="${ANDROID_KEY_PASSWORD:-throwaway}"
 
       # EXPECTED_UPLOAD_CERT_SHA256 이 비어 있으면 건너뛴다.
       # 첫 업로드 전에는 대조할 지문이 없기 때문이다.
