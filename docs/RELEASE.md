@@ -35,6 +35,11 @@ Play Console 에 따로 업로드하는 것 (저장소에 두지 않아도 된�
 
 - 앱 아이콘 512x512 PNG
 - 그래픽 이미지 1024x500 PNG/JPG
+
+**`scripts/make-icons.py` 가 위 파일 전부를 생성한다** (iOS 묶음 제외).
+`BRAND` / `TINT` 상수와 `draw_mark()` 의 마크를 자기 앱 것으로 교체한 뒤
+`pip install pillow` 하고 실행할 것. 마크 교체 없이 돌리면 loan-calculator
+의 예시 마크가 그대로 나온다.
 - 스크린샷 최소 2장 (16:9 또는 9:16, 최소 320px)
 
 `app.json` 의 `android.adaptiveIcon.backgroundColor` 를 브랜드 색의 연한 톤으로 맞춰 두면 도형만 바꿔도 통일감이 난다.
