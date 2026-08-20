@@ -41,14 +41,19 @@ kit 테스트는 앱 코드 없이 독립 실행된다: `npx jest src/kit`. 이�
 
 ## 새 앱 시작 절차
 
-### 1. 저장소 복제
+### 1. 저장소 만들기
+
+이 저장소는 GitHub template repository 다. 저장소 상단의 **Use this template ->
+Create a new repository** 로 히스토리 없는 새 저장소를 만든 뒤 clone 한다.
 
 ```bash
-git clone https://github.com/HanJaeJoon/microapp-starter my-new-app
+git clone https://github.com/HanJaeJoon/my-new-app
 cd my-new-app
-rm -rf .git && git init && git add -A && git commit -m "chore: microapp-starter 에서 시작"
 npm install
 ```
+
+이미 있는 저장소에 배선만 넣을 때는 template 을 쓸 수 없다. `.git` 을 제외한
+파일을 복사하고 `.gitignore` 를 병합한 뒤 한 커밋으로 올린다 (기존 히스토리 보존).
 
 동작 확인:
 
