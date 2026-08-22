@@ -14,9 +14,25 @@ export function useShareAvailability(): boolean {
   return available;
 }
 
-export async function captureCard(ref: React.RefObject<View | null>): Promise<string> {
+// fileName 을 주면 캡처 임시 파일(ReactNative-snapshot-image....png)을
+// 캐시 디렉터리에 그 이름으로 옮겨, 공유/저장 시 사용자에게 보이는 파일명을 정한다.
+//
+// expo-file-system 은 saveImageToLibrary 의 expo-media-library 와 같은 이유로
+// 함수 안에서 지연 require 한다 (웹 번들이 로드 시점에 네이티브 모듈을 평가하지
+// 않게). fileName 이 없으면 require 자체가 실행되지 않는다.
+export async function captureCard(
+  ref: React.RefObject<View | null>,
+  fileName?: string
+): Promise<string> {
   const uri = await captureRef(ref, { format: 'png', quality: 1 });
-  return uri.startsWith('file') ? uri : `file://${uri}`;
+  const captured = uri.startsWith('file') ? uri : `file://${uri}`;
+  if (!fileName) return captured;
+  const { File, Paths } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('expo-file-system') as typeof import('expo-file-system');
+  const dest = new File(Paths.cache, fileName);
+  await new File(captured).move(dest, { overwrite: true });
+  return dest.uri;
 }
 
 export async function shareImage(uri: string): Promise<void> {
