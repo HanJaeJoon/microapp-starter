@@ -23,7 +23,7 @@ export function ThemedLineChart(props: {
    * 주 계열과 함께 그릴 추가 계열. 방식별 비교처럼 여러 곡선을 겹칠 때 쓴다.
    * 색은 앱이 지정한다 - kit 은 브랜드 색 외의 팔레트를 모른다.
    */
-  extraSeries?: { values: number[]; color: string }[];
+  extraSeries?: { values: number[]; /** `#RRGGBB` */ color: string }[];
   /** 계열 이름. 주 계열부터 extraSeries 순서로 대응한다. */
   legend?: string[];
   width: number;
@@ -46,6 +46,10 @@ export function ThemedLineChart(props: {
   decimalPlaces?: number;
 }) {
   const { colors, brandColor } = props;
+
+  // chart-kit renderLegend 는 datasets[i] 색을 쓰므로 계열 수보다 긴 legend 는
+  // LineChart 에 넘기기 전에 거절한다.
+  assertLegendLength(props.legend, props.extraSeries?.length ?? 0);
 
   // chart-kit 은 선 색 콜백에 1 보다 작은 opacity 를 넘길 때가 있어
   // 여러 계열을 겹치면 색이 흐려져 구분이 어렵다. 하한을 둔다.
@@ -91,11 +95,29 @@ export function ThemedLineChart(props: {
   );
 }
 
-// #RRGGBB -> rgba(r, g, b, a)
-function hexToRgba(hex: string, opacity: number): string {
-  const value = hex.replace('#', '');
-  const r = parseInt(value.slice(0, 2), 16);
-  const g = parseInt(value.slice(2, 4), 16);
-  const b = parseInt(value.slice(4, 6), 16);
+/**
+ * chart-kit renderLegend 가 datasets[i] 색을 쓰므로,
+ * legend 가 계열 수보다 길면 런타임 예외가 난다.
+ */
+export function assertLegendLength(
+  legend: string[] | undefined,
+  extraSeriesLength: number,
+): void {
+  const datasetCount = 1 + extraSeriesLength;
+  if (legend && legend.length > datasetCount) {
+    throw new Error('ThemedLineChart: legend length exceeds dataset count');
+  }
+}
+
+/**
+ * `#RRGGBB` 만 받는다. `#RGB`, `rgb()`, 색 이름은 불가.
+ */
+export function hexToRgba(hex: string, opacity: number): string {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+    throw new Error('ThemedLineChart: color must be #RRGGBB');
+  }
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
