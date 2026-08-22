@@ -29,11 +29,17 @@ export async function shareImage(uri: string): Promise<void> {
 // 최상위에서 import 하면 웹 번들이 로드되는 순간 throw 해서 앱 전체가 빈 화면이 된다.
 // kit/ads 가 Expo Go 를 다루는 것과 같은 방식으로 여기서 지연 require 한다.
 // 웹에서 이 함수를 호출하면 throw 하며, 호출부의 try/catch 가 받는다.
+//
+// SDK 57 에서 saveToLibraryAsync 는 메인 엔트리에서 호출 즉시 throw 하는
+// deprecated 스텁이 됐다. 새 클래스 API 인 Asset.create() 를 쓴다.
+// Android 네이티브 구현이 filePath.toFile() 을 쓰므로 인자는 file:// 스킴
+// URI 여야 한다. captureCard 가 이미 file:// 로 정규화해 반환한다.
 export async function saveImageToLibrary(uri: string): Promise<'saved' | 'denied'> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const MediaLibrary = require('expo-media-library') as typeof import('expo-media-library');
-  const { granted } = await MediaLibrary.requestPermissionsAsync(true);
+  const { Asset, requestPermissionsAsync } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('expo-media-library') as typeof import('expo-media-library');
+  const { granted } = await requestPermissionsAsync(true);
   if (!granted) return 'denied';
-  await MediaLibrary.saveToLibraryAsync(uri);
+  await Asset.create(uri);
   return 'saved';
 }
