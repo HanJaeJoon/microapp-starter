@@ -11,7 +11,7 @@
 ## 구성
 
 - `i18n/` - 로케일 감지와 i18n 인스턴스 생성
-- `currency.ts` - 통화 포맷과 환산 표기
+- `currency.ts` - 통화/소수 포맷과 환산 표기
 - `theme.ts` - 라이트/다크 팔레트
 - `prefs.ts` - AsyncStorage 기반 값 저장/복원
 - `ads/` - AdMob 배너
