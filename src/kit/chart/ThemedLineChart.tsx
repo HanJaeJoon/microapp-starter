@@ -5,6 +5,17 @@ import { ThemeColors } from '../theme';
 
 const MIN_STROKE_OPACITY = 0.9;
 
+// 마지막 X축 라벨의 오른쪽 절반이 잘리지 않게 SVG 캔버스만 넓히는 여유 폭(px).
+//
+// chart-kit 은 X축 라벨을 데이터 점 위 가운데 정렬로 그리는데, 마지막 점은
+// 캔버스 오른쪽 끝에서 한 칸(플롯 폭/점 개수, 점이 많으면 몇 px)밖에 안
+// 떨어져 있어 "360" 같은 라벨의 오른쪽 절반이 캔버스 밖으로 나가 잘린다.
+// chart-kit 은 SVG 폭을 width - margin*2 - marginRight 로 계산하면서 플롯
+// 좌표는 전부 width 만 쓰므로, marginRight 를 음수로 주면 플롯/격자/범례는
+// 그대로 두고 캔버스만 오른쪽으로 넓어져 라벨이 온전히 보인다.
+// 12px 면 fontSize 12 기준 숫자 3~4자리 라벨의 절반을 덮는다.
+const X_LABEL_RIGHT_OVERFLOW = 12;
+
 export function ThemedLineChart(props: {
   labels: string[];
   values: number[];
@@ -73,7 +84,9 @@ export function ThemedLineChart(props: {
         propsForBackgroundLines: { stroke: colors.chartGrid },
       }}
       bezier
-      style={props.style}
+      // 음수 marginRight 만큼 SVG 캔버스가 넓어진다 (X_LABEL_RIGHT_OVERFLOW 주석 참고).
+      // 컨테이너(카드)에는 그만큼의 오른쪽 패딩 여유가 있어야 한다.
+      style={{ ...props.style, marginRight: -X_LABEL_RIGHT_OVERFLOW }}
     />
   );
 }
