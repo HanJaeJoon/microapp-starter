@@ -31,6 +31,7 @@ type Strings = {
   shareFailTitle: string;
   shareFailBody: string;
   ok: string;
+  privacyOptions: string;
 };
 
 export const translations: Record<AppLocale, Strings> = {
@@ -59,6 +60,7 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: '공유 실패',
     shareFailBody: '이미지를 만들지 못했습니다. 다시 시도해 주세요.',
     ok: '확인',
+    privacyOptions: '광고 개인 설정',
   },
   en: {
     title: 'Compound Interest',
@@ -85,6 +87,7 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: 'Share failed',
     shareFailBody: 'Could not create the image. Please try again.',
     ok: 'OK',
+    privacyOptions: 'Ad privacy settings',
   },
   ja: {
     title: '複利計算',
@@ -111,6 +114,7 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: '共有に失敗しました',
     shareFailBody: '画像を作成できませんでした。もう一度お試しください。',
     ok: 'OK',
+    privacyOptions: '広告のプライバシー設定',
   },
   de: {
     title: 'Zinseszins-Rechner',
@@ -137,6 +141,7 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: 'Teilen fehlgeschlagen',
     shareFailBody: 'Das Bild konnte nicht erstellt werden. Bitte erneut versuchen.',
     ok: 'OK',
+    privacyOptions: 'Datenschutz für Werbung',
   },
   es: {
     title: 'Interés compuesto',
@@ -163,6 +168,7 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: 'Error al compartir',
     shareFailBody: 'No se pudo crear la imagen. Inténtalo de nuevo.',
     ok: 'OK',
+    privacyOptions: 'Privacidad de anuncios',
   },
   zh: {
     title: '复利计算器',
@@ -188,5 +194,6 @@ export const translations: Record<AppLocale, Strings> = {
     shareFailTitle: '分享失败',
     shareFailBody: '未能生成图片，请重试。',
     ok: '确定',
+    privacyOptions: '广告隐私设置',
   },
 };

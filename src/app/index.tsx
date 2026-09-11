@@ -11,6 +11,12 @@ import {
 } from 'react-native';
 
 import AdBanner from '@/kit/ads/AdBanner';
+import {
+  shouldRequestAds,
+  showPrivacyOptions,
+  useAdsConsentResult,
+  usePrivacyOptionsRequired,
+} from '@/kit/ads/consent';
 import { ThemedLineChart } from '@/kit/chart/ThemedLineChart';
 import { decimateLabels } from '@/kit/chart/decimateLabels';
 import { formatCurrency, resolveTargetCurrency } from '@/kit/currency';
@@ -45,6 +51,11 @@ export default function Index() {
   const colors = useThemeColors(THEME_OVERRIDES);
   const { width } = useWindowDimensions();
   const canShare = useShareAvailability();
+
+  // _layout 이 시작 시 호출한 ensureAdsConsent() 의 결과를 구독한다.
+  // 판정 전에는 null 이라 배너를 렌더하지 않는다.
+  const consent = useAdsConsentResult();
+  const privacyOptionsRequired = usePrivacyOptionsRequired();
 
   const [principal, setPrincipal] = useState(DEFAULTS.principal);
   const [monthlyContribution, setMonthlyContribution] = useState(DEFAULTS.monthlyContribution);
@@ -240,7 +251,23 @@ export default function Index() {
         </View>
       )}
 
-      <AdBanner productionUnitId={BRANDING.adBannerUnitId ?? undefined} />
+      {/*
+        UMP 가 "광고 개인 설정" 진입점을 요구하는 지역(EEA/UK 등)에서만 노출된다.
+        그 외 지역에서는 privacyOptionsRequirementStatus 가 NOT_REQUIRED 라 숨는다.
+      */}
+      {privacyOptionsRequired && (
+        <TouchableOpacity style={styles.privacyButton} onPress={() => showPrivacyOptions()}>
+          <Text style={[styles.privacyButtonText, { color: colors.subtext }]}>
+            {t('privacyOptions')}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* 동의 판정이 끝나기 전에는 배너를 요청하지 않는다 */}
+      <AdBanner
+        productionUnitId={BRANDING.adBannerUnitId ?? undefined}
+        enabled={shouldRequestAds(consent)}
+      />
 
       {/* 공유 카드는 화면 밖에 렌더링해 두고 캡처한다 */}
       <View style={styles.offscreen} pointerEvents="none">
@@ -425,6 +452,15 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  privacyButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  privacyButtonText: {
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
   offscreen: {
     position: 'absolute',
