@@ -14,7 +14,7 @@
 - `currency.ts` - 통화/소수 포맷과 환산 표기
 - `theme.ts` - 라이트/다크 팔레트
 - `prefs.ts` - AsyncStorage 기반 값 저장/복원
-- `ads/` - AdMob 배너와 UMP 광고 동의 (아래 참고)
+- `ads/` - AdMob 배너, UMP 광고 동의, 보상형 광고 (아래 참고)
 - `share/` - 브랜드 카드 골격과 캡처/공유/저장
 - `chart/` - 차트 라벨 처리와 테마 적용 라인 차트
 
@@ -26,6 +26,7 @@ Platform) 동의를 받아야 한다. 동의 흐름 없이 배포하면 정책 �
 - `ads/consentLogic.ts` - 결과 해석/재시도/디버그 옵션 정리. 네이티브를 모르는 순수 함수
 - `ads/consent.ts` - `AdsConsent` 호출 어댑터와 결과 스토어 (`consent.web.ts` 는 웹 스텁)
 - `ads/AdBanner.tsx` - `enabled` 프롭으로 동의 판정 전 배너 요청을 막는다
+- `ads/rewardedState.ts` / `ads/rewarded.ts` - 보상형 광고 (아래 별도 절)
 
 ### 공개 API
 
@@ -63,3 +64,75 @@ shouldRequestAds(consent, 'block'); // 규제 지역 비중이 크면 아예 막
 
 의존성 추가는 없다 (`react-native-google-mobile-ads` 를 이미 쓰고 있다).
 Android 대상이므로 `app.json` 의 iOS 전용 UMP 설정은 건드리지 않는다.
+
+## ads/ - 보상형 광고
+
+"광고를 보고 이어하기/하트 충전" 류의 보상형 광고. 광고 SDK 는 콜백으로만 말을 걸어오고
+(로드 완료/실패/보상/닫힘) 순서가 기기마다 달라서, 그 순서를 화면 코드에 흩어 두면
+"보상을 두 번 주는" 류의 버그가 생긴다. 전이를 상태 기계 한곳에 모으고 화면은 상태만 본다.
+
+- `ads/rewardedState.ts` - 전이/재시도 정책/파생 판단. 네이티브를 모르는 순수 함수
+- `ads/rewarded.ts` - `RewardedAd` 호출 어댑터와 `useRewardedAd` 훅 (`rewarded.web.ts` 는 웹 스텁)
+
+### 공개 API
+
+| 이름 | 용도 |
+| --- | --- |
+| `useRewardedAd(options)` | 광고 한 개를 로드해 두고 필요할 때 보여준다 |
+| `rewardedReducer` / `createRewardedReducer(policy)` | 상태 기계 (정책을 바꾸려면 후자) |
+| `canShow` / `shouldUseMockGate` / `isUnavailable` / `isBlocked` | 상태에서 화면 판단으로 |
+| `retryDelayMs(failures, policy?)` | 재시도 지연 (지수 백오프, 상한 있음) |
+
+```ts
+const rewarded = useRewardedAd({
+  productionUnitId: BRANDING.adRewardedUnitId ?? undefined,
+  onReward: grantContinue,
+  enabled: shouldRequestAds(useAdsConsentResult()), // UMP 동의 게이트
+});
+```
+
+`RewardedStatus` 는 일곱 가지다.
+
+| 상태 | 뜻 | 화면 |
+| --- | --- | --- |
+| `blocked` | `enabled=false`. 로드도 리스너 등록도 하지 않는다 | 버튼 비활성 |
+| `unavailable` | 네이티브 모듈이 없다 (Expo Go/웹) | 모의 게이트로 폴백 |
+| `loading` | 로드 중 | 버튼 비활성 |
+| `ready` | 보여줄 수 있다 | 버튼 활성 |
+| `showing` | 표시 중 | - |
+| `error` | 로드 실패, 재시도 대기 | 버튼 비활성 |
+| `exhausted` | 재시도 상한까지 실패 | "광고를 사용할 수 없습니다" |
+
+- **동의 게이트는 훅 안에 있다.** `enabled` 가 `false` 인 동안에는 광고 객체를 만들지 않고
+  상태는 `blocked` 다. `false -> true` 로 바뀌면 그때 로드가 시작되고, `true -> false` 면
+  광고 객체를 정리하고 다시 `blocked` 로 돌아간다. 훅을 조건부로 부르려고 호스트
+  컴포넌트를 따로 둘 필요가 없다
+- **재시도는 상한이 있다.** 기본은 재시도 3회, 지연 2초 -> 4초 -> 8초(상한 30초)이고
+  모두 실패하면 `exhausted` 에서 멈춘다. 무한 재시도는 재고가 없는 계정에서 버튼이
+  영영 비활성인 채로 남는다. 옵션 `maxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs`
+  로 조절한다 (`maxRetries: 3, retryBaseDelayMs: 30_000` 이면 30초 간격 3회)
+- `exhausted` 에서 사용자가 다시 시도할 수 있게 하려면 `reload()` 를 버튼에 건다
+- 로드 실패를 곧바로 무료 보상으로 바꾸지 않는다. 광고를 안 보고도 보상을 얻는 길이 된다.
+  모의 게이트 폴백은 네이티브 모듈이 아예 없을 때(`unavailable`)만이다
+
+문구는 kit 에 없다. "광고를 사용할 수 없습니다", "광고 불러오는 중" 같은 라벨과 `Alert` 는
+앱 i18n 에 둔다.
+
+### 다른 앱에 역전파할 때 (3줄)
+
+1. `src/kit/ads/rewardedState.ts`, `rewarded.ts`, `rewarded.web.ts` 와 테스트
+   `src/kit/__tests__/rewardedState.test.ts` 를 복사하고, 앱의 `src/lib/ads/` 사본
+   (`rewarded.ts`, `rewardedState.ts`, `__tests__/rewardedState.test.ts`)을 지운다
+2. 동의 게이트용 호스트 컴포넌트(brick-rogue `components/RewardedRetryHost.tsx`,
+   poker-defense `app/index.tsx` 안 `RewardedAdHost`)와 그 상태를 올려받던
+   `useState` / `onChange` 배선을 지우고, 화면에서 훅을 직접 부른다:
+   `const rewarded = useRewardedAd({ productionUnitId, onReward, enabled: adsAllowed })`
+3. 광고 불가 안내를 붙인다. `rewarded.unavailable` 이면 "광고를 사용할 수 없습니다" 를
+   버튼 자리에 띄우고, 기존의 "로드 중" 라벨은 `!rewarded.useMockGate && !rewarded.ready`
+   조건을 그대로 쓴다
+
+상태 전이를 보고 동작하는 코드(poker-defense 의 `gateAction(prev, next)`)가 있으면
+`blocked` 가 새로 들어온다는 것에 주의한다. 동의 전 초기 상태가 `loading` 이 아니라
+`blocked` 이고, 여기서는 어떤 보상도 나오지 않는다.
+
+의존성 추가는 없다 (`react-native-google-mobile-ads` 를 이미 쓰고 있다).
