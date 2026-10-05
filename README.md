@@ -78,6 +78,10 @@ pnpm start
 
 `android.package` 는 Play 에 한 번 올리면 **영구히 바꿀 수 없다.** 올리기 전에 확정할 것.
 
+새 앱의 `android.package` 는 `com.whochoolab.<앱>` 형식을 쓴다 (2026-10-05 결정). Play 개발자 표시명 "Whochoo Lab" 과 맞추고 패키지명에 실명이 드러나지 않게 하려는 것이다. `app.json` 의 `com.example.microappstarter` 는 템플릿 플레이스홀더다.
+
+이미 Play 에 올라간 기존 앱(`com.hanjaejoon.*`)은 패키지명을 바꿀 수 없으므로 그대로 둔다.
+
 ### 3. 도메인 갈아끼우기
 
 `src/lib/compound.ts` 를 자기 계산 로직으로 바꾼다. 이 파일이 예시로 보여주는 것:
