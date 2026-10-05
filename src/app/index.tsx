@@ -219,6 +219,7 @@ export default function Index() {
             values={chart.values}
             width={Math.max(width - 64, 240)}
             decimalPlaces={0}
+            locale={appLocale}
             brandColor={BRANDING.brandColor}
             colors={colors}
             style={styles.chart}

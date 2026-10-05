@@ -1,4 +1,4 @@
-import { formatCurrency, resolveTargetCurrency } from '../currency';
+import { formatCurrency, formatDecimal, resolveTargetCurrency } from '../currency';
 
 describe('resolveTargetCurrency', () => {
   it('기기 통화 코드를 대문자로 반환한다', () => {
@@ -19,6 +19,30 @@ describe('resolveTargetCurrency', () => {
     expect(resolveTargetCurrency('WON')).toBe('WON'); // 3글자 알파벳이면 그대로 신뢰
     expect(resolveTargetCurrency('12$')).toBeNull();
     expect(resolveTargetCurrency('EURO')).toBeNull();
+  });
+});
+
+describe('formatDecimal', () => {
+  it('지원하는 6개 locale 전부에서 해당 locale의 소수 구분자를 쓴다', () => {
+    // 점(.) 소수 구분자 locale
+    expect(formatDecimal(110.94, 'en', 1)).toBe('110.9');
+    expect(formatDecimal(110.94, 'ko', 1)).toBe('110.9');
+    expect(formatDecimal(110.94, 'ja', 1)).toBe('110.9');
+    expect(formatDecimal(110.94, 'zh', 1)).toBe('110.9');
+    // 쉼표(,) 소수 구분자 locale
+    expect(formatDecimal(110.94, 'de', 1)).toBe('110,9');
+    expect(formatDecimal(110.94, 'es', 1)).toBe('110,9');
+  });
+
+  it('소수 자릿수를 고정한다 (부족분 반올림/초과분 절사)', () => {
+    expect(formatDecimal(2.5, 'en', 2)).toBe('2.50');
+    expect(formatDecimal(2.945, 'de', 2)).toBe('2,95');
+    expect(formatDecimal(3, 'es', 1)).toBe('3,0');
+  });
+
+  it('천 단위 구분자도 locale 표기법을 따른다', () => {
+    expect(formatDecimal(1234.5, 'en', 1)).toBe('1,234.5');
+    expect(formatDecimal(1234.5, 'de', 1)).toBe('1.234,5');
   });
 });
 

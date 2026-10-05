@@ -1,7 +1,9 @@
 import React from 'react';
 import { ViewStyle } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import { formatDecimal } from '../currency';
 import { ThemeColors } from '../theme';
+import { yAxisDecimalPlaces } from './yAxisDecimalPlaces';
 
 const MIN_STROKE_OPACITY = 0.9;
 
@@ -29,6 +31,8 @@ export function ThemedLineChart(props: {
   width: number;
   height?: number;
   yAxisSuffix?: string;
+  // Y축 숫자 라벨을 locale 표기법(소수/천 단위 구분자)으로 표시한다. 없으면 chart-kit 기본 표기(점, 구분자 없음)
+  locale?: string;
   brandColor: string;
   colors: ThemeColors;
   // react-native-chart-kit의 style prop은 Partial<ViewStyle>만 받는다 (StyleProp 불가)
@@ -42,10 +46,13 @@ export function ThemedLineChart(props: {
    * 면이 겹쳐 곡선 색이 묻힌다. 여러 계열을 겹칠 때는 꺼야 구분이 된다.
    */
   hideFill?: boolean;
-  /** y축 라벨 소수점 자릿수. 금액은 보통 0 이 읽기 좋다. 기본 1. */
+  /**
+   * y축 라벨 소수점 자릿수. 금액은 보통 0 이 읽기 좋다.
+   * 생략하면 값 범위에 맞춰 고른다 (최소 1, 범위가 좁아 라벨이 뭉개질 때만 늘어난다).
+   */
   decimalPlaces?: number;
 }) {
-  const { colors, brandColor } = props;
+  const { colors, brandColor, locale } = props;
 
   // chart-kit renderLegend 는 datasets[i] 색을 쓰므로 계열 수보다 긴 legend 는
   // LineChart 에 넘기기 전에 거절한다.
@@ -68,6 +75,11 @@ export function ThemedLineChart(props: {
     })),
   ];
 
+  // chart-kit 은 Y축 min/max 를 전 계열 합집합으로 잡으므로 자릿수도 전 계열로 고른다.
+  const decimalPlaces =
+    props.decimalPlaces ??
+    yAxisDecimalPlaces([...props.values, ...(props.extraSeries ?? []).flatMap((s) => s.values)]);
+
   return (
     <LineChart
       data={{ labels: props.labels, datasets, legend: props.legend }}
@@ -77,11 +89,15 @@ export function ThemedLineChart(props: {
       yAxisInterval={1}
       withDots={!props.hideDots}
       withShadow={!props.hideFill}
+      // chart-kit 이 toFixed 로 만든 라벨을 locale 표기로 바꾼다 (de/es 는 쉼표 소수 구분자)
+      formatYLabel={
+        locale ? (yLabel) => formatDecimal(Number(yLabel), locale, decimalPlaces) : undefined
+      }
       chartConfig={{
         backgroundColor: colors.card,
         backgroundGradientFrom: colors.card,
         backgroundGradientTo: colors.card,
-        decimalPlaces: props.decimalPlaces ?? 1,
+        decimalPlaces,
         color: (opacity = 1) => hexToRgba(brandColor, opacity),
         labelColor: () => colors.subtext,
         propsForDots: { r: '4', strokeWidth: '2', stroke: brandColor },

@@ -20,3 +20,15 @@ export function formatCurrency(
     minimumFractionDigits: 2,
   }).format(amount);
 }
+
+// 소수 자릿수를 고정해 locale 표기법으로 숫자를 표시한다 (예: en 110.9 / de 110,9).
+export function formatDecimal(
+  value: number,
+  locale: string,
+  fractionDigits: number
+): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
+}
