@@ -23,10 +23,10 @@ import os
 
 from PIL import Image, ImageDraw
 
-# app.json 의 splash backgroundColor 와 같아야 한다
-BRAND = (0x1F, 0x6F, 0x54)
-# app.json 의 android.adaptiveIcon.backgroundColor 와 같아야 한다
-TINT = (0xE4, 0xF1, 0xEC)
+# app.json 의 splash backgroundColor (#208AEF), src/lib/branding.ts 의 brandColor 와 같아야 한다
+BRAND = (0x20, 0x8A, 0xEF)
+# app.json 의 android.adaptiveIcon.backgroundColor (#E6F4FE) 와 같아야 한다
+TINT = (0xE6, 0xF4, 0xFE)
 WHITE = (0xFF, 0xFF, 0xFF)
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
