@@ -1,37 +1,36 @@
 import {
   DEFAULT_RETRY_POLICY,
-  INITIAL_REWARDED_STATE,
-  canShow,
-  createRewardedReducer,
   initialRewardedState,
-  isBlocked,
-  isUnavailable,
   loadEffect,
-  resolveRetryPolicy,
-  retryDelayMs,
   rewardedReducer,
-  shouldUseMockGate,
   type RetryPolicy,
   type RewardedEvent,
   type RewardedState,
 } from '../ads/rewardedState';
 
-function run(events: RewardedEvent[], from: RewardedState = INITIAL_REWARDED_STATE) {
-  return events.reduce(rewardedReducer, from);
+const INITIAL = initialRewardedState(true);
+
+// reduce 는 콜백에 index 를 세 번째 인자로 넘기므로 rewardedReducer 를 그대로 주면
+// index 가 정책 자리로 들어간다. 화살표 함수로 두 인자만 넘긴다.
+function run(events: RewardedEvent[], from: RewardedState = INITIAL) {
+  return events.reduce((s, e) => rewardedReducer(s, e), from);
+}
+
+/** 재시도 지연 (error 상태의 loadEffect 가 주는 값) */
+function retryDelay(failures: number, policy?: RetryPolicy) {
+  const action = loadEffect('error', failures, policy);
+  if (action.kind !== 'retry') throw new Error('retry 가 아니다');
+  return action.delayMs;
 }
 
 describe('보상형 광고 상태 기계', () => {
   it('처음에는 로드 중이고 보여줄 수 없다', () => {
-    expect(INITIAL_REWARDED_STATE.status).toBe('loading');
-    expect(canShow(INITIAL_REWARDED_STATE)).toBe(false);
-    expect(shouldUseMockGate(INITIAL_REWARDED_STATE)).toBe(false);
-    expect(isUnavailable(INITIAL_REWARDED_STATE)).toBe(false);
+    expect(INITIAL).toEqual({ status: 'loading', failures: 0, earned: false });
   });
 
   it('로드가 끝나면 보여줄 수 있다', () => {
     const s = run([{ type: 'loaded' }]);
     expect(s.status).toBe('ready');
-    expect(canShow(s)).toBe(true);
   });
 
   it('표시 -> 보상 -> 닫힘 이면 보상을 받고 다시 로드로 돌아간다', () => {
@@ -81,7 +80,7 @@ describe('보상형 광고 상태 기계', () => {
 
   it('네이티브 모듈이 없으면 모의 게이트를 쓰고 이후 이벤트에 흔들리지 않는다', () => {
     const s = run([{ type: 'unsupported' }]);
-    expect(shouldUseMockGate(s)).toBe(true);
+    expect(s.status).toBe('unavailable');
     expect(run([{ type: 'load' }, { type: 'loaded' }, { type: 'loadFailed' }], s)).toEqual(s);
   });
 
@@ -92,19 +91,14 @@ describe('보상형 광고 상태 기계', () => {
 
   it('새 광고 객체를 붙이면 상태가 처음으로 돌아간다', () => {
     const failed = run([{ type: 'loadFailed' }, { type: 'loadFailed' }]);
-    expect(rewardedReducer(failed, { type: 'attach' })).toEqual(INITIAL_REWARDED_STATE);
+    expect(rewardedReducer(failed, { type: 'attach' })).toEqual(INITIAL);
   });
 });
 
 describe('동의 게이트 (enabled)', () => {
   it('enabled=false 로 시작하면 로드 중을 거치지 않고 blocked 다', () => {
     const s = initialRewardedState(false);
-    expect(s.status).toBe('blocked');
-    expect(isBlocked(s)).toBe(true);
-    expect(canShow(s)).toBe(false);
-    expect(shouldUseMockGate(s)).toBe(false);
-    expect(isUnavailable(s)).toBe(false);
-    expect(initialRewardedState(true)).toEqual(INITIAL_REWARDED_STATE);
+    expect(s).toEqual({ status: 'blocked', failures: 0, earned: false });
   });
 
   it('blocked 상태에서는 로드/로드 결과 이벤트를 모두 무시한다', () => {
@@ -132,15 +126,13 @@ describe('동의 게이트 (enabled)', () => {
 describe('재시도 상한 (exhausted)', () => {
   it('기본 정책은 재시도 3회이고 그 뒤에는 광고를 쓸 수 없다', () => {
     expect(DEFAULT_RETRY_POLICY.maxRetries).toBe(3);
-    let s = INITIAL_REWARDED_STATE;
+    let s = INITIAL;
     for (let i = 0; i < DEFAULT_RETRY_POLICY.maxRetries; i++) {
       s = run([{ type: 'loadFailed' }, { type: 'load' }], s);
       expect(s.status).toBe('loading');
     }
     s = rewardedReducer(s, { type: 'loadFailed' });
     expect(s.status).toBe('exhausted');
-    expect(isUnavailable(s)).toBe(true);
-    expect(canShow(s)).toBe(false);
     expect(loadEffect(s.status, s.failures).kind).toBe('none');
   });
 
@@ -153,52 +145,40 @@ describe('재시도 상한 (exhausted)', () => {
     ]);
     expect(exhausted.status).toBe('exhausted');
     const retried = rewardedReducer(exhausted, { type: 'load' });
-    expect(retried).toEqual(INITIAL_REWARDED_STATE);
+    expect(retried).toEqual(INITIAL);
   });
 
-  it('상한은 옵션으로 조절한다', () => {
-    const once = createRewardedReducer(resolveRetryPolicy({ maxRetries: 1 }));
-    const first = once(INITIAL_REWARDED_STATE, { type: 'loadFailed' });
+  it('상한은 정책으로 조절한다', () => {
+    const once: RetryPolicy = { ...DEFAULT_RETRY_POLICY, maxRetries: 1 };
+    const first = rewardedReducer(INITIAL, { type: 'loadFailed' }, once);
     expect(first.status).toBe('error');
-    expect(once(first, { type: 'loadFailed' }).status).toBe('exhausted');
+    expect(rewardedReducer(first, { type: 'loadFailed' }, once).status).toBe('exhausted');
 
-    const never = createRewardedReducer(resolveRetryPolicy({ maxRetries: 0 }));
-    expect(never(INITIAL_REWARDED_STATE, { type: 'loadFailed' }).status).toBe('exhausted');
-  });
-
-  it('기본값은 지정한 항목만 덮어쓴다', () => {
-    expect(resolveRetryPolicy()).toEqual(DEFAULT_RETRY_POLICY);
-    expect(resolveRetryPolicy({ maxDelayMs: 5_000 })).toEqual({
-      ...DEFAULT_RETRY_POLICY,
-      maxDelayMs: 5_000,
-    });
+    const never: RetryPolicy = { ...DEFAULT_RETRY_POLICY, maxRetries: 0 };
+    expect(rewardedReducer(INITIAL, { type: 'loadFailed' }, never).status).toBe('exhausted');
   });
 });
 
 describe('재시도 백오프', () => {
-  it('실패가 없으면 지연이 없다', () => {
-    expect(retryDelayMs(0)).toBe(0);
-  });
-
   it('지수로 늘고 30초에서 멈춘다', () => {
-    expect(retryDelayMs(1)).toBe(2000);
-    expect(retryDelayMs(2)).toBe(4000);
-    expect(retryDelayMs(3)).toBe(8000);
-    expect(retryDelayMs(4)).toBe(16000);
-    expect(retryDelayMs(5)).toBe(30000);
-    expect(retryDelayMs(50)).toBe(30000);
+    expect(retryDelay(1)).toBe(2000);
+    expect(retryDelay(2)).toBe(4000);
+    expect(retryDelay(3)).toBe(8000);
+    expect(retryDelay(4)).toBe(16000);
+    expect(retryDelay(5)).toBe(30000);
+    expect(retryDelay(50)).toBe(30000);
   });
 
   it('단조 증가한다', () => {
     for (let n = 1; n < 20; n++) {
-      expect(retryDelayMs(n + 1)).toBeGreaterThanOrEqual(retryDelayMs(n));
+      expect(retryDelay(n + 1)).toBeGreaterThanOrEqual(retryDelay(n));
     }
   });
 
   it('정책을 주면 그 간격을 쓴다 (예: 30초 고정)', () => {
     const fixed: RetryPolicy = { maxRetries: 3, baseDelayMs: 30_000, maxDelayMs: 30_000 };
-    expect(retryDelayMs(1, fixed)).toBe(30_000);
-    expect(retryDelayMs(3, fixed)).toBe(30_000);
+    expect(retryDelay(1, fixed)).toBe(30_000);
+    expect(retryDelay(3, fixed)).toBe(30_000);
   });
 });
 
@@ -210,7 +190,6 @@ describe('재시도 백오프', () => {
  * 값이 바뀌었을 때만 다시 돈다. 재시도 타이머는 fireRetry() 로 직접 돌린다.
  */
 function createDriver(policy: RetryPolicy = DEFAULT_RETRY_POLICY, enabled = true) {
-  const reducer = createRewardedReducer(policy);
   let state = initialRewardedState(enabled);
   let lastDeps: string | null = null;
   let pendingRetry: (() => void) | null = null;
@@ -227,7 +206,7 @@ function createDriver(policy: RetryPolicy = DEFAULT_RETRY_POLICY, enabled = true
   }
 
   function send(event: RewardedEvent) {
-    state = reducer(state, event);
+    state = rewardedReducer(state, event, policy);
     runEffect();
   }
 

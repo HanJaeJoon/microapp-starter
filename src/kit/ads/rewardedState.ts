@@ -7,6 +7,8 @@
 // 이 파일은 react-native-google-mobile-ads 를 import 하지 않는다 (consentLogic.ts 와 같은 규칙).
 // 네이티브 호출은 rewarded.ts 의 얇은 어댑터가 담당한다.
 
+import { backoffMs } from './consentLogic';
+
 export type RewardedStatus =
   /** 동의 게이트 등으로 아직 광고를 요청하지 않는다 (enabled=false). 로드/리스너 없음. */
   | 'blocked'
@@ -60,94 +62,74 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxDelayMs: 30_000,
 };
 
-export function resolveRetryPolicy(policy?: Partial<RetryPolicy>): RetryPolicy {
-  return { ...DEFAULT_RETRY_POLICY, ...policy };
-}
-
-export const INITIAL_REWARDED_STATE: RewardedState = {
-  status: 'loading',
-  failures: 0,
-  earned: false,
-};
-
 /**
  * 마운트 시점의 상태. enabled=false 로 시작하면 'loading' 을 한 번 스치지 않고
  * 곧바로 'blocked' 이다 (동의 판정 전에 버튼이 깜빡이지 않도록).
  */
 export function initialRewardedState(enabled: boolean): RewardedState {
-  return enabled ? INITIAL_REWARDED_STATE : { status: 'blocked', failures: 0, earned: false };
-}
-
-/** 재시도 지연. 지수 백오프하되 상한에서 멈춘다. */
-export function retryDelayMs(failures: number, policy: RetryPolicy = DEFAULT_RETRY_POLICY): number {
-  if (failures <= 0) return 0;
-  return Math.min(policy.maxDelayMs, policy.baseDelayMs * 2 ** (failures - 1));
-}
-
-/** 실패 횟수가 상한을 넘었는지 (넘으면 더 재시도하지 않는다). */
-export function isExhausted(failures: number, policy: RetryPolicy = DEFAULT_RETRY_POLICY): boolean {
-  return failures > policy.maxRetries;
+  return { status: enabled ? 'loading' : 'blocked', failures: 0, earned: false };
 }
 
 /**
- * 정책이 들어간 리듀서를 만든다. 재시도 상한이 앱마다 다를 수 있어 리듀서를
- * 정책으로 감싼다. 정책을 안 주면 DEFAULT_RETRY_POLICY 를 쓰는 rewardedReducer 와 같다.
+ * 상태 기계. 재시도 상한이 앱마다 다를 수 있어 정책을 세 번째 인자로 받는다
+ * (안 주면 DEFAULT_RETRY_POLICY). useReducer 에는 정책을 묶은 화살표 함수를 넘긴다.
  */
-export function createRewardedReducer(policy: RetryPolicy = DEFAULT_RETRY_POLICY) {
-  return function reducer(state: RewardedState, event: RewardedEvent): RewardedState {
-    switch (event.type) {
-      case 'attach':
-        // 새 광고 객체가 붙었으므로 이전 객체 기준의 상태는 버린다.
-        return { status: 'loading', failures: 0, earned: false };
+export function rewardedReducer(
+  state: RewardedState,
+  event: RewardedEvent,
+  policy: RetryPolicy = DEFAULT_RETRY_POLICY
+): RewardedState {
+  switch (event.type) {
+    case 'attach':
+      // 새 광고 객체가 붙었으므로 이전 객체 기준의 상태는 버린다.
+      return initialRewardedState(true);
 
-      case 'disabled':
-        return { status: 'blocked', failures: 0, earned: false };
+    case 'disabled':
+      return initialRewardedState(false);
 
-      case 'unsupported':
-        return { status: 'unavailable', failures: 0, earned: false };
+    case 'unsupported':
+      return { status: 'unavailable', failures: 0, earned: false };
 
-      case 'load':
-        // 광고를 요청하지 않는 상태에서는 로드하지 않는다.
-        if (state.status === 'blocked' || state.status === 'unavailable') return state;
-        // 표시 중에 다시 로드하지 않는다 (같은 광고 객체를 재사용하므로).
-        if (state.status === 'showing') return state;
-        // 상한까지 실패한 뒤의 'load' 는 앱이 부른 수동 재시도다. 실패 횟수를 지운다.
-        if (state.status === 'exhausted') return { status: 'loading', failures: 0, earned: false };
-        return { ...state, status: 'loading', earned: false };
+    case 'load':
+      // 광고를 요청하지 않는 상태에서는 로드하지 않는다.
+      if (state.status === 'blocked' || state.status === 'unavailable') return state;
+      // 표시 중에 다시 로드하지 않는다 (같은 광고 객체를 재사용하므로).
+      if (state.status === 'showing') return state;
+      // 상한까지 실패한 뒤의 'load' 는 앱이 부른 수동 재시도다. 실패 횟수를 지운다.
+      if (state.status === 'exhausted') return initialRewardedState(true);
+      return { ...state, status: 'loading', earned: false };
 
-      case 'loaded':
-        if (state.status === 'blocked' || state.status === 'unavailable') return state;
-        return { status: 'ready', failures: 0, earned: state.earned };
+    case 'loaded':
+      if (state.status === 'blocked' || state.status === 'unavailable') return state;
+      return { status: 'ready', failures: 0, earned: state.earned };
 
-      case 'loadFailed': {
-        if (state.status === 'blocked' || state.status === 'unavailable') return state;
-        const failures = state.failures + 1;
-        return {
-          status: isExhausted(failures, policy) ? 'exhausted' : 'error',
-          failures,
-          earned: false,
-        };
-      }
-
-      case 'show':
-        // 준비되지 않았으면 표시 요청을 무시한다.
-        if (state.status !== 'ready') return state;
-        return { ...state, status: 'showing', earned: false };
-
-      case 'earned':
-        // 표시 중에 온 보상만 인정한다. 그래야 보상을 두 번 주지 않는다.
-        if (state.status !== 'showing') return state;
-        return { ...state, earned: true };
-
-      case 'closed':
-        if (state.status !== 'showing') return state;
-        // 광고 객체는 1회용이라 닫히면 곧바로 다음 것을 로드한다.
-        return { status: 'loading', failures: 0, earned: false };
+    case 'loadFailed': {
+      if (state.status === 'blocked' || state.status === 'unavailable') return state;
+      const failures = state.failures + 1;
+      // 상한을 넘으면 더 재시도하지 않는다.
+      return {
+        status: failures > policy.maxRetries ? 'exhausted' : 'error',
+        failures,
+        earned: false,
+      };
     }
-  };
-}
 
-export const rewardedReducer = createRewardedReducer();
+    case 'show':
+      // 준비되지 않았으면 표시 요청을 무시한다.
+      if (state.status !== 'ready') return state;
+      return { ...state, status: 'showing', earned: false };
+
+    case 'earned':
+      // 표시 중에 온 보상만 인정한다. 그래야 보상을 두 번 주지 않는다.
+      if (state.status !== 'showing') return state;
+      return { ...state, earned: true };
+
+    case 'closed':
+      if (state.status !== 'showing') return state;
+      // 광고 객체는 1회용이라 닫히면 곧바로 다음 것을 로드한다.
+      return initialRewardedState(true);
+  }
+}
 
 /**
  * 상태가 바뀐 뒤 해야 할 로드 동작.
@@ -164,40 +146,11 @@ export function loadEffect(
   failures: number,
   policy: RetryPolicy = DEFAULT_RETRY_POLICY
 ): LoadAction {
-  if (status === 'error') return { kind: 'retry', delayMs: retryDelayMs(failures, policy) };
+  if (status === 'error') {
+    return { kind: 'retry', delayMs: backoffMs(failures, policy.baseDelayMs, policy.maxDelayMs) };
+  }
   if (status === 'loading') return { kind: 'load' };
   return { kind: 'none' };
-}
-
-/** 지금 광고를 보여줄 수 있는가. */
-export function canShow(state: RewardedState): boolean {
-  return state.status === 'ready';
-}
-
-/**
- * 모의 게이트(진행 바 등)로 폴백해야 하는가.
- *
- * 네이티브 모듈이 아예 없을 때만 폴백한다. 로드 실패는 재시도로 처리한다 -
- * 실패를 곧바로 무료 보상으로 바꾸면 광고를 안 보고도 보상을 얻는 길이 생긴다.
- */
-export function shouldUseMockGate(state: RewardedState): boolean {
-  return state.status === 'unavailable';
-}
-
-/**
- * 광고를 쓸 수 없다고 안내할 상태인가 ("광고를 사용할 수 없습니다").
- *
- * 재시도 상한까지 실패한 경우다. 'blocked'(동의 판정 전/거부)는 포함하지 않는다 -
- * 동의는 나중에 바뀔 수 있고, 거부를 최종 불가로 볼지는 앱이 정한다.
- * 거부도 같은 문구로 묶고 싶으면 `isUnavailable(state) || consentDenied` 로 합친다.
- */
-export function isUnavailable(state: RewardedState): boolean {
-  return state.status === 'exhausted';
-}
-
-/** 동의 게이트로 광고를 막아 둔 상태인가. */
-export function isBlocked(state: RewardedState): boolean {
-  return state.status === 'blocked';
 }
 
 // --- 훅 계약 -----------------------------------------------------------
@@ -215,23 +168,27 @@ export type UseRewardedAdOptions = {
    * false -> true 로 바뀌면 그때 로드가 시작된다.
    */
   enabled?: boolean;
-  /** 최초 로드 실패 뒤 재시도 횟수 (기본 3). 모두 실패하면 'exhausted'. */
-  maxRetries?: number;
-  /** 첫 재시도 지연 (기본 2000ms, 이후 지수로 늘어난다). */
-  retryBaseDelayMs?: number;
-  /** 재시도 지연 상한 (기본 30000ms). */
-  retryMaxDelayMs?: number;
+  /** 재시도 정책. 지정한 항목만 DEFAULT_RETRY_POLICY 를 덮어쓴다. */
+  retry?: Partial<RetryPolicy>;
 };
 
 export type UseRewardedAd = {
   state: RewardedState;
-  /** 광고를 보여줄 수 있는 상태인지. */
+  /** 광고를 보여줄 수 있는 상태인지 (status 'ready'). */
   ready: boolean;
-  /** 네이티브 모듈이 없어 모의 게이트로 폴백해야 하는지. */
+  /**
+   * 네이티브 모듈이 없어 모의 게이트로 폴백해야 하는지 (status 'unavailable').
+   * 로드 실패는 여기 들어가지 않는다 - 실패를 곧바로 무료 보상으로 바꾸면
+   * 광고를 안 보고도 보상을 얻는 길이 생긴다.
+   */
   useMockGate: boolean;
-  /** 재시도 상한까지 실패해 "광고를 사용할 수 없습니다" 를 띄워야 하는지. */
+  /**
+   * 재시도 상한까지 실패해 "광고를 사용할 수 없습니다" 를 띄워야 하는지 (status 'exhausted').
+   * 'blocked'(동의 판정 전/거부)는 포함하지 않는다. 동의는 나중에 바뀔 수 있고,
+   * 거부도 같은 문구로 묶고 싶으면 `unavailable || blocked` 로 합친다.
+   */
   unavailable: boolean;
-  /** enabled=false 라 아직 광고를 요청하지 않는 상태인지. */
+  /** enabled=false 라 아직 광고를 요청하지 않는 상태인지 (status 'blocked'). */
   blocked: boolean;
   /** 광고를 띄운다. 준비되지 않았으면 아무 일도 하지 않는다. */
   show(): void;

@@ -9,14 +9,12 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 
 import {
-  canShow,
-  createRewardedReducer,
+  DEFAULT_RETRY_POLICY,
   initialRewardedState,
-  isBlocked,
-  isUnavailable,
   loadEffect,
-  resolveRetryPolicy,
-  shouldUseMockGate,
+  rewardedReducer,
+  type RewardedEvent,
+  type RewardedState,
   type UseRewardedAd,
   type UseRewardedAdOptions,
 } from './rewardedState';
@@ -87,24 +85,22 @@ function createNativeRewarded(
  * 로드에 실패하면 지수 백오프로 다시 시도하고, 상한까지 실패하면 'exhausted' 로 멈춘다.
  */
 export function useRewardedAd(options: UseRewardedAdOptions): UseRewardedAd {
-  const {
-    productionUnitId,
-    enabled = true,
-    maxRetries,
-    retryBaseDelayMs,
-    retryMaxDelayMs,
-  } = options;
+  const { productionUnitId, enabled = true, retry } = options;
 
+  // retry 는 매 렌더 새 객체로 올 수 있으니 필드 값으로 메모한다.
+  const { maxRetries, baseDelayMs, maxDelayMs } = retry ?? {};
   const policy = useMemo(
-    () =>
-      resolveRetryPolicy({
-        ...(maxRetries === undefined ? {} : { maxRetries }),
-        ...(retryBaseDelayMs === undefined ? {} : { baseDelayMs: retryBaseDelayMs }),
-        ...(retryMaxDelayMs === undefined ? {} : { maxDelayMs: retryMaxDelayMs }),
-      }),
-    [maxRetries, retryBaseDelayMs, retryMaxDelayMs]
+    () => ({
+      maxRetries: maxRetries ?? DEFAULT_RETRY_POLICY.maxRetries,
+      baseDelayMs: baseDelayMs ?? DEFAULT_RETRY_POLICY.baseDelayMs,
+      maxDelayMs: maxDelayMs ?? DEFAULT_RETRY_POLICY.maxDelayMs,
+    }),
+    [maxRetries, baseDelayMs, maxDelayMs]
   );
-  const reducer = useMemo(() => createRewardedReducer(policy), [policy]);
+  const reducer = useCallback(
+    (s: RewardedState, e: RewardedEvent) => rewardedReducer(s, e, policy),
+    [policy]
+  );
 
   const [state, dispatch] = useReducer(reducer, enabled, initialRewardedState);
   const adRef = useRef<NativeRewarded | null>(null);
@@ -162,7 +158,7 @@ export function useRewardedAd(options: UseRewardedAdOptions): UseRewardedAd {
 
   const show = useCallback(() => {
     const ad = adRef.current;
-    if (!ad || !canShow(state)) return;
+    if (!ad || state.status !== 'ready') return;
     dispatch({ type: 'show' });
     ad.show();
   }, [state]);
@@ -173,10 +169,10 @@ export function useRewardedAd(options: UseRewardedAdOptions): UseRewardedAd {
 
   return {
     state,
-    ready: canShow(state),
-    useMockGate: shouldUseMockGate(state),
-    unavailable: isUnavailable(state),
-    blocked: isBlocked(state),
+    ready: state.status === 'ready',
+    useMockGate: state.status === 'unavailable',
+    unavailable: state.status === 'exhausted',
+    blocked: state.status === 'blocked',
     show,
     reload,
   };

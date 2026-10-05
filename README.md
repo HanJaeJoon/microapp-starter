@@ -119,7 +119,3 @@ pnpm start
 **SDK 메이저 업그레이드에서는 락파일(`pnpm-lock.yaml`)을 재생성할 것.** npm 시절 기존 락파일 위에 `expo install --fix` 를 돌리면 `expo-modules-core` 가 `node_modules/expo/` 아래로 중첩 설치돼 jest-expo 프리셋과 config plugin 이 모듈을 못 찾는 문제가 있었다. hoisted 레이아웃은 같은 위험이 있으므로 규율을 유지한다.
 
 **Public 저장소를 권장한다.** GitHub Actions 분이 무제한이다. Private 은 계정 전체 월 2,000분을 공유하고 Android 릴리스 빌드가 약 25분이라 월 80회가 한계다.
-
-## kit 에 대해 남은 판단
-
-`kit/currency.ts` 의 `formatKrwApprox` / `formatApproxConverted` 는 환율을 인자로 요구한다. 오프라인 계산기는 환율 데이터를 가져오지 않으므로 이 스타터의 예시 화면은 두 함수를 쓰지 않는다. 실시간 환산이 필요한 앱이 두 번째로 나오면 그때 유지할지 판단한다.

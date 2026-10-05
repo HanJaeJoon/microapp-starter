@@ -6,8 +6,6 @@ import { useMemo } from 'react';
 
 import {
   initialRewardedState,
-  isBlocked,
-  isUnavailable,
   type RewardedState,
   type UseRewardedAd,
   type UseRewardedAdOptions,
@@ -25,10 +23,10 @@ export function useRewardedAd(options: UseRewardedAdOptions): UseRewardedAd {
   );
   return {
     state,
-    ready: false,
+    ready: state.status === 'ready',
     useMockGate: state.status === 'unavailable',
-    unavailable: isUnavailable(state),
-    blocked: isBlocked(state),
+    unavailable: state.status === 'exhausted',
+    blocked: state.status === 'blocked',
     show: () => {},
     reload: () => {},
   };

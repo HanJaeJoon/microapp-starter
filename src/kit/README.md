@@ -11,7 +11,7 @@
 ## 구성
 
 - `i18n/` - 로케일 감지와 i18n 인스턴스 생성
-- `currency.ts` - 통화/소수 포맷과 환산 표기
+- `currency.ts` - 통화 포맷과 환산 대상 통화 판정
 - `theme.ts` - 라이트/다크 팔레트
 - `prefs.ts` - AsyncStorage 기반 값 저장/복원
 - `ads/` - AdMob 배너, UMP 광고 동의, 보상형 광고 (아래 참고)
@@ -23,7 +23,7 @@
 EEA/UK 등 규제 지역에 배포하려면 광고를 요청하기 전에 UMP(Google User Messaging
 Platform) 동의를 받아야 한다. 동의 흐름 없이 배포하면 정책 위반 소지가 있다.
 
-- `ads/consentLogic.ts` - 결과 해석/재시도/디버그 옵션 정리. 네이티브를 모르는 순수 함수
+- `ads/consentLogic.ts` - 결과 해석/재시도(`backoffMs`)/디버그 옵션 정리. 네이티브를 모르는 순수 함수
 - `ads/consent.ts` - `AdsConsent` 호출 어댑터와 결과 스토어 (`consent.web.ts` 는 웹 스텁)
 - `ads/AdBanner.tsx` - `enabled` 프롭으로 동의 판정 전 배너 요청을 막는다
 - `ads/rewardedState.ts` / `ads/rewarded.ts` - 보상형 광고 (아래 별도 절)
@@ -71,7 +71,7 @@ Android 대상이므로 `app.json` 의 iOS 전용 UMP 설정은 건드리지 않
 (로드 완료/실패/보상/닫힘) 순서가 기기마다 달라서, 그 순서를 화면 코드에 흩어 두면
 "보상을 두 번 주는" 류의 버그가 생긴다. 전이를 상태 기계 한곳에 모으고 화면은 상태만 본다.
 
-- `ads/rewardedState.ts` - 전이/재시도 정책/파생 판단. 네이티브를 모르는 순수 함수
+- `ads/rewardedState.ts` - 전이/재시도 정책. 네이티브를 모르는 순수 함수 (백오프는 `consentLogic.ts` 의 `backoffMs` 를 같이 쓴다)
 - `ads/rewarded.ts` - `RewardedAd` 호출 어댑터와 `useRewardedAd` 훅 (`rewarded.web.ts` 는 웹 스텁)
 
 ### 공개 API
@@ -79,15 +79,19 @@ Android 대상이므로 `app.json` 의 iOS 전용 UMP 설정은 건드리지 않
 | 이름 | 용도 |
 | --- | --- |
 | `useRewardedAd(options)` | 광고 한 개를 로드해 두고 필요할 때 보여준다 |
-| `rewardedReducer` / `createRewardedReducer(policy)` | 상태 기계 (정책을 바꾸려면 후자) |
-| `canShow` / `shouldUseMockGate` / `isUnavailable` / `isBlocked` | 상태에서 화면 판단으로 |
-| `retryDelayMs(failures, policy?)` | 재시도 지연 (지수 백오프, 상한 있음) |
+| `rewardedReducer(state, event, policy?)` | 상태 기계 (정책 생략 시 `DEFAULT_RETRY_POLICY`) |
+| `initialRewardedState(enabled)` | 마운트 시점 상태 (`true` 면 `loading`, `false` 면 `blocked`) |
+| `loadEffect(status, failures, policy?)` | 상태가 바뀐 뒤 할 로드 동작 (재시도 지연 포함) |
+
+화면 판단(보여줄 수 있는지, 모의 게이트, 광고 불가, 동의 대기)은 훅 반환값
+`ready` / `useMockGate` / `unavailable` / `blocked` 로 받는다.
 
 ```ts
 const rewarded = useRewardedAd({
   productionUnitId: BRANDING.adRewardedUnitId ?? undefined,
   onReward: grantContinue,
   enabled: shouldRequestAds(useAdsConsentResult()), // UMP 동의 게이트
+  retry: { baseDelayMs: 30_000 }, // 생략 가능. 지정한 항목만 기본값을 덮어쓴다
 });
 ```
 
@@ -109,8 +113,8 @@ const rewarded = useRewardedAd({
   컴포넌트를 따로 둘 필요가 없다
 - **재시도는 상한이 있다.** 기본은 재시도 3회, 지연 2초 -> 4초 -> 8초(상한 30초)이고
   모두 실패하면 `exhausted` 에서 멈춘다. 무한 재시도는 재고가 없는 계정에서 버튼이
-  영영 비활성인 채로 남는다. 옵션 `maxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs`
-  로 조절한다 (`maxRetries: 3, retryBaseDelayMs: 30_000` 이면 30초 간격 3회)
+  영영 비활성인 채로 남는다. 옵션 `retry: { maxRetries, baseDelayMs, maxDelayMs }`
+  로 조절한다 (`retry: { baseDelayMs: 30_000 }` 이면 30초 간격 3회)
 - `exhausted` 에서 사용자가 다시 시도할 수 있게 하려면 `reload()` 를 버튼에 건다
 - 로드 실패를 곧바로 무료 보상으로 바꾸지 않는다. 광고를 안 보고도 보상을 얻는 길이 된다.
   모의 게이트 폴백은 네이티브 모듈이 아예 없을 때(`unavailable`)만이다
@@ -136,3 +140,20 @@ const rewarded = useRewardedAd({
 `blocked` 이고, 여기서는 어떤 보상도 나오지 않는다.
 
 의존성 추가는 없다 (`react-native-google-mobile-ads` 를 이미 쓰고 있다).
+
+### 이번 정리에서 바뀐 API (이미 kit 을 복사한 앱)
+
+`src/kit/` 를 통째로 다시 복사한 뒤 앱 코드에서 다음을 고친다.
+
+- `INITIAL_REWARDED_STATE` -> `initialRewardedState(true)`.
+  `createRewardedReducer(policy)` -> `rewardedReducer(s, e, policy)`.
+  `events.reduce(rewardedReducer, s)` 는 index 가 정책 자리로 들어가므로
+  `events.reduce((acc, e) => rewardedReducer(acc, e), s)` 로 바꾼다
+- `useRewardedAd` 의 `maxRetries` / `retryBaseDelayMs` / `retryMaxDelayMs` ->
+  `retry: { maxRetries, baseDelayMs, maxDelayMs }`
+- `canShow` / `shouldUseMockGate` / `isUnavailable` / `isBlocked` 와 `rewardedState` 의
+  `retryDelayMs`, `resolveRetryPolicy`, `isExhausted` 는 없어졌다. 훅 반환값
+  `ready` / `useMockGate` / `unavailable` / `blocked` 나 `state.status` 비교로 바꾼다
+- `getAdsConsentResult()` 와 `ensureAdsConsent` 의 `maxRetries` 옵션은 없어졌다.
+  판정은 `useAdsConsentResult()` 로 받는다
+- `currency.ts` 의 `formatDecimal` / `formatKrwApprox` / `formatApproxConverted` 는 없어졌다
