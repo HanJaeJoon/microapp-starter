@@ -24,7 +24,8 @@
 그린다 (de/es 는 `1.234,5`, en/ko 는 `1,234.5`). kit 은 앱 로케일을 모르므로 prop 으로 받고,
 생략하면 chart-kit 기본 표기(점, 천 단위 구분자 없음)다. `decimalPlaces` 를 생략하면
 `chart/yAxisDecimalPlaces.ts` 가 전 계열 값 범위로 자릿수를 고른다 (최소 1, 범위가 좁아
-라벨이 `0.0` 으로 뭉개질 때만 늘린다). 금액처럼 자릿수가 정해진 값은 `decimalPlaces` 를 준다.
+라벨이 `0.0` 으로 뭉개지거나 반올림 때문에 라벨 간격이 고르지 않으면 늘린다, 최대 4).
+금액처럼 자릿수가 정해진 값은 `decimalPlaces` 를 준다.
 
 ```tsx
 <ThemedLineChart labels={labels} values={values} decimalPlaces={0} locale={appLocale} ... />
