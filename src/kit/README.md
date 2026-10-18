@@ -121,12 +121,12 @@ const rewarded = useRewardedAd({
 | 상태 | 뜻 | 화면 |
 | --- | --- | --- |
 | `blocked` | `enabled=false`. 로드도 리스너 등록도 하지 않는다 | 버튼 비활성 |
-| `unavailable` | 네이티브 모듈이 없다 (Expo Go/웹) | 모의 게이트로 폴백 |
+| `unavailable` | 네이티브 모듈이 없다 (Expo Go) | 모의 게이트로 폴백 |
 | `loading` | 로드 중 | 버튼 비활성 |
 | `ready` | 보여줄 수 있다 | 버튼 활성 |
 | `showing` | 표시 중 | - |
 | `error` | 로드 실패, 재시도 대기 | 버튼 비활성 |
-| `exhausted` | 재시도 상한까지 실패 | "광고를 사용할 수 없습니다" |
+| `exhausted` | 재시도 상한까지 실패, 또는 웹 | "광고를 사용할 수 없습니다" |
 
 - **동의 게이트는 훅 안에 있다.** `enabled` 가 `false` 인 동안에는 광고 객체를 만들지 않고
   상태는 `blocked` 다. `false -> true` 로 바뀌면 그때 로드가 시작되고, `true -> false` 면
@@ -138,7 +138,9 @@ const rewarded = useRewardedAd({
   로 조절한다 (`retry: { baseDelayMs: 30_000 }` 이면 30초 간격 3회)
 - `exhausted` 에서 사용자가 다시 시도할 수 있게 하려면 `reload()` 를 버튼에 건다
 - 로드 실패를 곧바로 무료 보상으로 바꾸지 않는다. 광고를 안 보고도 보상을 얻는 길이 된다.
-  모의 게이트 폴백은 네이티브 모듈이 아예 없을 때(`unavailable`)만이다
+  모의 게이트 폴백은 네이티브 모듈이 아예 없을 때(`unavailable`, Expo Go)만이다
+- 웹 스텁(`rewarded.web.ts`)은 항상 `exhausted` 를 돌려준다. 웹에서는 광고도 무료 보상도 없고
+  `reload()` 는 아무 일도 하지 않는다
 
 문구는 kit 에 없다. "광고를 사용할 수 없습니다", "광고 불러오는 중" 같은 라벨과 `Alert` 는
 앱 i18n 에 둔다.

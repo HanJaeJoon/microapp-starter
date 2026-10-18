@@ -12,7 +12,7 @@ import { backoffMs } from './consentLogic';
 export type RewardedStatus =
   /** 동의 게이트 등으로 아직 광고를 요청하지 않는다 (enabled=false). 로드/리스너 없음. */
   | 'blocked'
-  /** 네이티브 모듈이 없다 (Expo Go/웹 등). 모의 게이트로 폴백한다. */
+  /** 네이티브 모듈이 없다 (Expo Go). 모의 게이트로 폴백한다. 웹 스텁은 이 상태 대신 'exhausted' 다. */
   | 'unavailable'
   /** 로드 중. 버튼은 눌리지 않는다. */
   | 'loading'
@@ -22,7 +22,7 @@ export type RewardedStatus =
   | 'showing'
   /** 로드 실패. 백오프 후 다시 로드한다. */
   | 'error'
-  /** 재시도 상한까지 모두 실패. 더 로드하지 않는다 ("광고를 사용할 수 없습니다"). */
+  /** 재시도 상한까지 모두 실패, 또는 웹. 더 로드하지 않는다 ("광고를 사용할 수 없습니다"). */
   | 'exhausted';
 
 export type RewardedState = {
